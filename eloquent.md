@@ -388,7 +388,7 @@ Model::preventSilentlyDiscardingAttributes(! $this->app->isProduction());
 <a name="retrieving-models"></a>
 ## Retrieving Models
 
-Once you have created a model and [its associated database table](/docs/{{version}}/migrations#writing-migrations), you are ready to start retrieving data from your database. You can think of each Eloquent model as a powerful [query builder](/docs/{{version}}/queries) allowing you to fluently query the database table associated with the model. The model's `all` method will retrieve all of the records from the model's associated database table:
+Once you have created a model and [its associated database table](/docs/{{version}}/migrations#generating-migrations), you are ready to start retrieving data from your database. You can think of each Eloquent model as a powerful [query builder](/docs/{{version}}/queries) allowing you to fluently query the database table associated with the model. The model's `all` method will retrieve all of the records from the model's associated database table:
 
     use App\Models\Flight;
 
@@ -926,6 +926,10 @@ In the example above, we are retrieving the model from the database before calli
     Flight::destroy([1, 2, 3]);
 
     Flight::destroy(collect([1, 2, 3]));
+
+If you are utilizing [soft deleting models](#soft-deleting), you may permanently delete models via the `forceDestroy` method:
+
+    Flight::forceDestroy(1);
 
 > [!WARNING]  
 > The `destroy` method loads each model individually and calls the `delete` method so that the `deleting` and `deleted` events are properly dispatched for each model.

@@ -13,11 +13,13 @@
     - [Search](#search)
     - [Multi-search](#multisearch)
     - [Pause](#pause)
+- [Transforming Input Before Validation](#transforming-input-before-validation)
 - [Forms](#forms)
 - [Informational Messages](#informational-messages)
 - [Tables](#tables)
 - [Spin](#spin)
 - [Progress Bar](#progress)
+- [Clearing the Terminal](#clear)
 - [Terminal Considerations](#terminal-considerations)
 - [Unsupported Environments and Fallbacks](#fallbacks)
 
@@ -421,16 +423,6 @@ $categories = multiselect(
 );
 ```
 
-You may allow the user to easily select all options via the `canSelectAll` argument:
-
-```php
-$categories = multiselect(
-    label: 'What categories should be assigned?',
-    options: Category::pluck('name', 'id'),
-    canSelectAll: true
-);
-```
-
 <a name="multiselect-required"></a>
 #### Requiring a Value
 
@@ -731,6 +723,23 @@ use function Laravel\Prompts\pause;
 pause('Press ENTER to continue.');
 ```
 
+<a name="transforming-input-before-validation"></a>
+## Transforming Input Before Validation
+
+Sometimes you may want to transform the prompt input before validation takes place. For example, you may wish to remove white space from any provided strings. To accomplish this, many of the prompt functions provide a `transform` argument, which accepts a closure:
+
+```php
+$name = text(
+    label: 'What is your name?',
+    transform: fn (string $value) => trim($value),
+    validate: fn (string $value) => match (true) {
+        strlen($value) < 3 => 'The name must be at least 3 characters.',
+        strlen($value) > 255 => 'The name must not exceed 255 characters.',
+        default => null
+    }
+);
+```
+
 <a name="forms"></a>
 ## Forms
 
@@ -878,6 +887,17 @@ foreach ($users as $user) {
 }
 
 $progress->finish();
+```
+
+<a name="clear"></a>
+## Clearing the Terminal
+
+The `clear` function may be used to clear the user's terminal:
+
+```
+use function Laravel\Prompts\clear;
+
+clear();
 ```
 
 <a name="terminal-considerations"></a>

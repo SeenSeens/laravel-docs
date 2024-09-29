@@ -5,6 +5,7 @@
 - [Other Utilities](#other-utilities)
     - [Benchmarking](#benchmarking)
     - [Dates](#dates)
+    - [Deferred Functions](#deferred-functions)
     - [Lottery](#lottery)
     - [Pipeline](#pipeline)
     - [Sleep](#sleep)
@@ -69,7 +70,6 @@ Laravel includes a variety of global "helper" PHP functions. Many of these funct
 [Arr::sort](#method-array-sort)
 [Arr::sortDesc](#method-array-sort-desc)
 [Arr::sortRecursive](#method-array-sort-recursive)
-[Arr::sortRecursiveDesc](#method-array-sort-recursive-desc)
 [Arr::take](#method-array-take)
 [Arr::toCssClasses](#method-array-to-css-classes)
 [Arr::toCssStyles](#method-array-to-css-styles)
@@ -199,6 +199,7 @@ Laravel includes a variety of global "helper" PHP functions. Many of these funct
 [value](#method-value)
 [view](#method-view)
 [with](#method-with)
+[when](#method-when)
 
 </div>
 
@@ -1603,7 +1604,7 @@ If no path is provided, an `Illuminate\Routing\UrlGenerator` instance is returne
 <a name="method-abort"></a>
 #### `abort()` {.collection-method}
 
-The `abort` function throws [an HTTP exception](/docs/{{version}}/errors#http-exceptions) which will be rendered by the [exception handler](/docs/{{version}}/errors#the-exception-handler):
+The `abort` function throws [an HTTP exception](/docs/{{version}}/errors#http-exceptions) which will be rendered by the [exception handler](/docs/{{version}}/errors#handling-exceptions):
 
     abort(403);
 
@@ -1919,7 +1920,7 @@ An array of contextual data may also be passed to the function:
 
     logger('User has logged in.', ['id' => $user->id]);
 
-A [logger](/docs/{{version}}/errors#logging) instance will be returned if no value is passed to the function:
+A [logger](/docs/{{version}}/logging) instance will be returned if no value is passed to the function:
 
     logger()->error('You are not allowed here.');
 
@@ -2031,7 +2032,7 @@ The `redirect` function returns a [redirect HTTP response](/docs/{{version}}/res
 <a name="method-report"></a>
 #### `report()` {.collection-method}
 
-The `report` function will report an exception using your [exception handler](/docs/{{version}}/errors#the-exception-handler):
+The `report` function will report an exception using your [exception handler](/docs/{{version}}/errors#handling-exceptions):
 
     report($e);
 
@@ -2042,7 +2043,7 @@ The `report` function also accepts a string as an argument. When a string is giv
 <a name="method-report-if"></a>
 #### `report_if()` {.collection-method}
 
-The `report_if` function will report an exception using your [exception handler](/docs/{{version}}/errors#the-exception-handler) if the given condition is `true`:
+The `report_if` function will report an exception using your [exception handler](/docs/{{version}}/errors#handling-exceptions) if the given condition is `true`:
 
     report_if($shouldReport, $e);
 
@@ -2051,7 +2052,7 @@ The `report_if` function will report an exception using your [exception handler]
 <a name="method-report-unless"></a>
 #### `report_unless()` {.collection-method}
 
-The `report_unless` function will report an exception using your [exception handler](/docs/{{version}}/errors#the-exception-handler) if the given condition is `false`:
+The `report_unless` function will report an exception using your [exception handler](/docs/{{version}}/errors#handling-exceptions) if the given condition is `false`:
 
     report_unless($reportingDisabled, $e);
 
@@ -2069,7 +2070,7 @@ The `request` function returns the current [request](/docs/{{version}}/requests)
 <a name="method-rescue"></a>
 #### `rescue()` {.collection-method}
 
-The `rescue` function executes the given closure and catches any exceptions that occur during its execution. All exceptions that are caught will be sent to your [exception handler](/docs/{{version}}/errors#the-exception-handler); however, the request will continue processing:
+The `rescue` function executes the given closure and catches any exceptions that occur during its execution. All exceptions that are caught will be sent to your [exception handler](/docs/{{version}}/errors#handling-exceptions); however, the request will continue processing:
 
     return rescue(function () {
         return $this->method();
@@ -2304,6 +2305,23 @@ The `with` function returns the value it is given. If a closure is passed as the
 
     // 5
 
+<a name="method-when"></a>
+#### `when()` {.collection-method}
+
+The `when` function returns the value it is given if a given condition evaluates to `true`. Otherwise, `null` is returned. If a closure is passed as the second argument to the function, the closure will be executed and its returned value will be returned:
+
+    $value = when(true, 'Hello World');
+
+    $value = when(true, fn () => 'Hello World');
+
+The `when` function is primarily useful for conditionally rendering HTML attributes:
+
+```blade
+<div {!! when($condition, 'wire:poll="calculate"') !!}>
+    ...
+</div>
+```
+
 <a name="other-utilities"></a>
 ## Other Utilities
 
@@ -2352,6 +2370,61 @@ $now = Carbon::now();
 ```
 
 For a thorough discussion of Carbon and its features, please consult the [official Carbon documentation](https://carbon.nesbot.com/docs/).
+
+<a name="deferred-functions"></a>
+### Deferred Functions
+
+> [!WARNING]
+> Deferred functions are currently in beta while we gather community feedback.
+
+While Laravel's [queued jobs](/docs/{{version}}/queues) allow you to queue tasks for background processing, sometimes you may have simple tasks you would like to defer without configuring or maintaining a long-running queue worker.
+
+Deferred functions allow you to defer the execution of a closure until after the HTTP response has been sent to the user, keeping your application feeling fast and responsive. To defer the execution of a closure, simply pass the closure to the `Illuminate\Support\defer` function:
+
+```php
+use App\Services\Metrics;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use function Illuminate\Support\defer;
+
+Route::post('/orders', function (Request $request) {
+    // Create order...
+
+    defer(fn () => Metrics::reportOrder($order));
+
+    return $order;
+});
+```
+
+By default, deferred functions will only be executed if the HTTP response, Artisan command, or queued job from which `Illuminate\Support\defer` is invoked completes successfully. This means that deferred functions will not be executed if a request results in a `4xx` or `5xx` HTTP response. If you would like a deferred function to always execute, you may chain the `always` method onto your deferred function:
+
+```php
+defer(fn () => Metrics::reportOrder($order))->always();
+```
+
+<a name="cancelling-deferred-functions"></a>
+#### Cancelling Deferred Functions
+
+If you need to cancel a deferred function before it is executed, you can use the `forget` method to cancel the function by its name. To name a deferred function, provide a second argument to the `Illuminate\Support\defer` function:
+
+```php
+defer(fn () => Metrics::report(), 'reportMetrics');
+
+defer()->forget('reportMetrics');
+```
+
+<a name="deferred-function-compatibility"></a>
+#### Deferred Function Compatibility
+
+If you upgraded to Laravel 11.x from a Laravel 10.x application and your application's skeleton still contains an `app/Http/Kernel.php` file, you should add the `InvokeDeferredCallbacks` middleware to the beginning of the kernel's `$middleware` property:
+
+```php
+protected $middleware = [
+    \Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks::class, // [tl! add]
+    \App\Http\Middleware\TrustProxies::class,
+    // ...
+];
+```
 
 <a name="lottery"></a>
 ### Lottery
@@ -2452,6 +2525,12 @@ Laravel's `Sleep` class is a light-weight wrapper around PHP's native `sleep` an
 
 The `Sleep` class offers a variety of methods that allow you to work with different units of time:
 
+    // Return a value after sleeping...
+    $result = Sleep::for(1)->second()->then(fn () => 1 + 1);
+
+    // Sleep while a given value is true...
+    Sleep::for(1)->second()->while(fn () => shouldKeepSleeping());
+
     // Pause execution for 90 seconds...
     Sleep::for(1.5)->minutes();
 
@@ -2530,7 +2609,7 @@ it('checks if ready three times', function () {
 ```
 
 ```php tab=PHPUnit
-public function test_it_checks_if_ready_four_times()
+public function test_it_checks_if_ready_three_times()
 {
     Sleep::fake();
 

@@ -95,6 +95,10 @@ If you just need to retrieve a single row from a database table, you may use the
 
     return $user->email;
 
+If you would like to retrieve a single row from a database table, but throw an `Illuminate\Database\RecordNotFoundException` if no matching row is found, you may use the `firstOrFail` method. If the `RecordNotFoundException` is not caught, a 404 HTTP response is automatically sent back to the client:
+
+    $user = DB::table('users')->where('name', 'John')->firstOrFail();
+
 If you don't need an entire row, you may extract a single value from a record using the `value` method. This method will return the value of the column directly:
 
     $email = DB::table('users')->where('name', 'John')->value('email');
@@ -979,7 +983,7 @@ Alternatively, you may use the `limit` and `offset` methods. These methods are f
 
 Sometimes you may want certain query clauses to apply to a query based on another condition. For instance, you may only want to apply a `where` statement if a given input value is present on the incoming HTTP request. You may accomplish this using the `when` method:
 
-    $role = $request->string('role');
+    $role = $request->input('role');
 
     $users = DB::table('users')
                     ->when($role, function (Builder $query, string $role) {
